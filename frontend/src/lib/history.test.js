@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { modeOf, isTimed, fmtSec, setLabel, defaultConfig, buildSets, exLine, workoutVolume, effortOf, stepEffort, capEffort, isBw, isPerSide, sideReps, repStep } from './history.js'
+import { modeOf, isTimed, fmtSec, setLabel, defaultConfig, buildSets, exLine, workoutVolume, effortOf, stepEffort, capEffort, isBw, isPerSide, sideReps, repStep, effectiveRoutineId, plannedRoutineId, cycleOn, cycleIndex, cycleStartFor } from './history.js'
 import { EXDB } from './exercises.js'
 
 // Real ids out of the shipped catalogue, so the body-part fallback is exercised for real.
@@ -394,5 +394,49 @@ describe('workoutVolume', () => {
   it('leaves an unloaded bodyweight set at zero volume rather than inventing a number', () => {
     const w = { entries: [{ id: BW, target: { bodyweight: true }, sets: [{ w: 0, r: 20, done: true }] }] }
     expect(workoutVolume(w)).toBe(0)
+  })
+})
+
+describe('repeating cycle', () => {
+  const routines = [{ id: 'P' }, { id: 'Q' }, { id: 'L' }]
+  const S = (extra = {}) => ({ routines, week: { 1: 'P' }, dayPlan: {}, cycle: { on: true, start: '2026-09-21', days: ['P', 'Q', 'L', null] }, ...extra })
+
+  it('walks the days in order and repeats, regardless of weekday', () => {
+    const days = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28', '2026-09-29']
+    expect(days.map(d => plannedRoutineId(S(), d))).toEqual(['P', 'Q', 'L', null, 'P', 'Q', 'L', null, 'P'])
+  })
+
+  it('lands the rest day on a different weekday each week', () => {
+    expect(plannedRoutineId(S(), '2026-09-24')).toBe(null)
+    expect(plannedRoutineId(S(), '2026-10-01')).toBe('L')
+    expect(plannedRoutineId(S(), '2026-09-28')).toBe(null)
+  })
+
+  it('counts backwards before the start date too', () => {
+    expect(plannedRoutineId(S(), '2026-09-20')).toBe(null)
+    expect(plannedRoutineId(S(), '2026-09-17')).toBe('P')
+  })
+
+  it('crosses daylight-saving changes without skipping a day', () => {
+    const s = S({ cycle: { on: true, start: '2026-03-27', days: ['P', 'Q', 'L', null] } })
+    expect(['2026-03-28', '2026-03-29', '2026-03-30', '2026-03-31'].map(d => plannedRoutineId(s, d))).toEqual(['Q', 'L', null, 'P'])
+  })
+
+  it('still lets a per-day override win', () => {
+    const s = S({ dayPlan: { '2026-09-24': 'P', '2026-09-21': 'rest' } })
+    expect(effectiveRoutineId(s, '2026-09-24')).toBe('P')
+    expect(effectiveRoutineId(s, '2026-09-21')).toBe(null)
+  })
+
+  it('falls back to the weekly plan when the cycle is off or empty', () => {
+    expect(plannedRoutineId(S({ cycle: { on: false, start: '2026-09-21', days: ['Q'] } }), '2026-09-21')).toBe('P')
+    expect(plannedRoutineId(S({ cycle: { on: true, start: '2026-09-21', days: [] } }), '2026-09-21')).toBe('P')
+    expect(cycleOn({ week: {} })).toBe(false)
+  })
+
+  it('anchors the start so that today is the chosen day', () => {
+    const start = cycleStartFor('2026-09-24', 2)
+    expect(start).toBe('2026-09-22')
+    expect(cycleIndex(S({ cycle: { on: true, start, days: ['P', 'Q', 'L', null] } }), '2026-09-24')).toBe(2)
   })
 })

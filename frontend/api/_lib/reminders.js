@@ -2,10 +2,17 @@ import { kv, K } from './store.js';
 import { sendPush } from './push.js';
 import { REMINDER_WINDOW_MIN } from './config.js';
 
+const dayNumber = iso => Math.round(Date.parse(iso + 'T00:00:00Z') / 86400000);
+
 export function effectiveRoutineId(S, iso) {
   const ov = S.dayPlan?.[iso];
   if (ov === 'rest') return null;
   if (ov && S.routines?.some(r => r.id === ov)) return ov;
+  const c = S.cycle;
+  if (c?.on && c.start && c.days?.length) {
+    const n = c.days.length;
+    return c.days[(((dayNumber(iso) - dayNumber(c.start)) % n) + n) % n] || null;
+  }
   const wd = new Date(iso + 'T12:00:00').getDay();
   return S.week?.[wd] || null;
 }

@@ -158,12 +158,25 @@ export function bestWeightFor(S, exId) {
   }))
   return best
 }
+const dayNumber = iso => Math.round(Date.parse(iso + 'T00:00:00Z') / 86400000)
+export const cycleOn = S => !!(S.cycle?.on && S.cycle.start && S.cycle.days?.length)
+export function cycleIndex(S, iso) {
+  const n = S.cycle.days.length
+  return (((dayNumber(iso) - dayNumber(S.cycle.start)) % n) + n) % n
+}
+export function cycleStartFor(todayIso, index) {
+  return new Date((dayNumber(todayIso) - index) * 86400000).toISOString().slice(0, 10)
+}
+export function plannedRoutineId(S, iso) {
+  if (cycleOn(S)) return S.cycle.days[cycleIndex(S, iso)] || null
+  const wd = new Date(iso + 'T12:00:00').getDay()
+  return S.week[wd] || null
+}
 export function effectiveRoutineId(S, iso) {
   const ov = S.dayPlan[iso]
   if (ov === 'rest') return null
   if (ov && S.routines.some(r => r.id === ov)) return ov
-  const wd = new Date(iso + 'T12:00:00').getDay()
-  return S.week[wd] || null
+  return plannedRoutineId(S, iso)
 }
 export function effectiveRoutine(S, iso) {
   const id = effectiveRoutineId(S, iso)

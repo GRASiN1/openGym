@@ -3,7 +3,7 @@ import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { EXDB, EXIDX, BODYPARTS, isCardio, isBodyweightEq, allExercises, equipmentOf } from './lib/exercises.js'
 import { fmtDate, fmtNum, fmtVol, fmtDur, durPart, todayISO, uid, exCount, DAYN, MONTHS_LONG, ACCENTS } from './lib/format.js'
-import { lastEntryFor, bestWeightFor, buildSets, effectiveRoutineId, workoutVolume, setsDone, setsDoneActive, lastBW, supersetUnits, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, isBw, isPerSide, sideReps } from './lib/history.js'
+import { lastEntryFor, bestWeightFor, buildSets, effectiveRoutineId, plannedRoutineId, cycleOn, cycleIndex, cycleStartFor, workoutVolume, setsDone, setsDoneActive, lastBW, supersetUnits, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, isBw, isPerSide, sideReps } from './lib/history.js'
 import { beep, vibrate } from './lib/sound.js'
 import { t, instrFor, getLang, INSTR_LANGS } from './lib/i18n.js'
 import { nav } from './lib/nav.js'
@@ -45,11 +45,13 @@ export function confirmSheet(opts) {
 /* ============================ starter plan ============================ */
 export function loadStarterPlan() {
   const [push, pull, legs] = starterRoutines()
+  const fillCycle = cycleOn(S()) && !S().cycle.days.some(Boolean)
   update(st => {
     st.routines.push(push, pull, legs)
     st.week[1] = push.id; st.week[3] = pull.id; st.week[5] = legs.id
+    if (fillCycle) st.cycle = { on: true, start: todayISO(), days: [push.id, pull.id, legs.id, null] }
   })
-  toast(t('Starter plan loaded — Mon Push · Wed Pull · Fri Legs'))
+  toast(fillCycle ? t('Starter plan loaded — Push · Pull · Legs · Rest, repeating') : t('Starter plan loaded — Mon Push · Wed Pull · Fri Legs'))
 }
 
 /* ============================ weight picker (shared: body weight + goal) ============================ */
@@ -705,8 +707,8 @@ function PlanImport({ bundle, close }) {
 /* ============================ day override / assign ============================ */
 function DayOverride({ iso, close }) {
   const st = useStore(s => s.S)
-  const wd = new Date(iso + 'T12:00:00').getDay()
-  const weeklyR = st.routines.find(r => r.id === st.week[wd])
+  const weeklyR = st.routines.find(r => r.id === plannedRoutineId(st, iso))
+  const planLabel = cycleOn(st) ? t('Cycle day {0}:', cycleIndex(st, iso) + 1) : t('Weekly plan:')
   const hasOvr = st.dayPlan[iso] !== undefined
   const effId = effectiveRoutineId(st, iso)
   const set = v => {
@@ -716,7 +718,7 @@ function DayOverride({ iso, close }) {
   }
   return <>
     <h3>{fmtDate(iso, true)}</h3>
-    <div className="muted small" style={{ marginBottom: 12 }}>{t('Weekly plan:')} {weeklyR ? weeklyR.name : t('Rest')}{hasOvr && <span style={{ color: 'var(--orange)' }}> · {t('changed for this day')}</span>}<br />{t('Sick, missed a day or want a different session? Pick what to train instead.')}</div>
+    <div className="muted small" style={{ marginBottom: 12 }}>{planLabel} {weeklyR ? weeklyR.name : t('Rest')}{hasOvr && <span style={{ color: 'var(--orange)' }}> · {t('changed for this day')}</span>}<br />{t('Sick, missed a day or want a different session? Pick what to train instead.')}</div>
     <div className="list">
       {st.routines.map(r => <div key={r.id} className="item" onClick={() => set(r.id)}>
         <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
@@ -744,6 +746,36 @@ function DayAssign({ day, close }) {
   </>
 }
 export const dayAssignSheet = day => ui().openSheet(close => <DayAssign day={day} close={close} />)
+
+function CycleDayAssign({ index, close }) {
+  const st = useStore(s => s.S)
+  const cur = st.cycle.days[index] || null
+  const set = v => { update(s => { s.cycle.days[index] = v || null }); close() }
+  const remove = () => {
+    update(s => {
+      const today = cycleIndex(s, todayISO())
+      s.cycle.days.splice(index, 1)
+      const keep = index < today ? today - 1 : today >= s.cycle.days.length ? 0 : today
+      s.cycle.start = cycleStartFor(todayISO(), keep)
+    })
+    close()
+  }
+  return <>
+    <h3>{t('Day {0}', index + 1)}</h3>
+    <div className="list">
+      <div className="item" onClick={() => set('')}><span className="lrow-i" style={{ background: 'var(--surface-3)' }}><Icon name="moon" /></span><div className="grow"><div className="tt">{t('Rest day')}</div></div>{!cur && <Icon name="check" className="accent" />}</div>
+      {st.routines.map(r => <div key={r.id} className="item" onClick={() => set(r.id)}>
+        <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
+        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
+        {cur === r.id && <Icon name="check" className="accent" />}</div>)}
+    </div>
+    {st.cycle.days.length > 1 && <>
+      <div style={{ height: 12 }} />
+      <Button variant="danger" onClick={remove}>{t('Remove this day')}</Button>
+    </>}
+  </>
+}
+export const cycleDayAssignSheet = index => ui().openSheet(close => <CycleDayAssign index={index} close={close} />)
 
 /* ============================ workout detail ============================ */
 function WorkoutDetail({ w, close }) {

@@ -25,6 +25,10 @@ export default function RoutineEdit() {
 
   const edit = fn => update(s => { fn(s.routines.find(x => x.id === id).ex) })
   const move = (i, dir) => edit(ex => { const j = i + dir; if (j < 0 || j >= ex.length) return;[ex[i], ex[j]] = [ex[j], ex[i]]; cleanupSg(ex) })
+  const removeAt = (i, ex) => confirmSheet({
+    title: t('Remove exercise?'), message: t('“{0}” will be taken out of this routine. Your logged history stays.', String(ex.n || '').replace(/\b\w/g, c => c.toUpperCase())), confirmText: t('Remove'), danger: true,
+    onConfirm: () => edit(x => { x.splice(i, 1); cleanupSg(x) })
+  })
   const toggleLink = i => edit(ex => {
     if (i < 1) return
     const cur = ex[i], prev = ex[i - 1]
@@ -69,7 +73,10 @@ export default function RoutineEdit() {
           <Thumb ex={ex} />
           <div className="grow"><div className="tt capitalize">{ex.n}</div><div className="ss">{exLine(e, S.unit)}</div></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 'none', alignItems: 'center' }}>
-            {i > 0 && <button className={'iconbtn' + (linkedPrev ? ' on-ss' : '')} title={t('Superset with exercise above')} style={{ width: 32, height: 28, borderRadius: 8, fontSize: 15 }} onClick={ev => { ev.stopPropagation(); toggleLink(i) }}><Icon name="link" /></button>}
+            <div style={{ display: 'flex', gap: 2 }}>
+              {i > 0 && <button className={'iconbtn' + (linkedPrev ? ' on-ss' : '')} title={t('Superset with exercise above')} style={{ width: 32, height: 28, borderRadius: 8, fontSize: 15 }} onClick={ev => { ev.stopPropagation(); toggleLink(i) }}><Icon name="link" /></button>}
+              <button className="iconbtn" aria-label={t('Remove from routine')} title={t('Remove from routine')} style={{ width: 28, height: 28, borderRadius: 8, fontSize: 14, color: 'var(--red)' }} onClick={ev => { ev.stopPropagation(); removeAt(i, ex) }}><Icon name="trash" /></button>
+            </div>
             <div style={{ display: 'flex', gap: 2 }}>
               <button className="iconbtn" aria-label="Move up" style={{ width: 28, height: 24, borderRadius: 7, fontSize: 12 }} onClick={ev => { ev.stopPropagation(); move(i, -1) }}><Icon name="chevronUp" /></button>
               <button className="iconbtn" aria-label="Move down" style={{ width: 28, height: 24, borderRadius: 7, fontSize: 12 }} onClick={ev => { ev.stopPropagation(); move(i, 1) }}><Icon name="chevronDown" /></button>
@@ -102,6 +109,7 @@ export default function RoutineEdit() {
         update(s => {
           s.routines = s.routines.filter(x => x.id !== id)
           Object.keys(s.week).forEach(k => { if (s.week[k] === id) delete s.week[k] })
+          if (s.cycle?.days) s.cycle.days = s.cycle.days.map(x => (x === id ? null : x))
           Object.keys(s.dayPlan).forEach(k => { if (s.dayPlan[k] === id) delete s.dayPlan[k] })
         })
         nav('/plan')
