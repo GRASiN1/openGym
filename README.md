@@ -103,6 +103,13 @@ a build step locally either way.
 > Want it reachable from your phone over the internet with passkeys? You'll need an HTTPS
 > domain — a two-line change in `.env`. See **[docs/SELF_HOSTING.md](docs/SELF_HOSTING.md)**.
 
+## Host it free on Vercel (no machine of your own)
+
+No box to keep running? The same app — passkeys, sync, push notifications — deploys to Vercel's
+free Hobby plan with a free Upstash Redis database for storage. Import the repo with
+**Root Directory `frontend`**, connect Upstash from the Storage tab, redeploy, and add it to your
+iPhone's home screen from Safari. Step by step: **[docs/VERCEL.md](docs/VERCEL.md)**.
+
 ## Mobile app (no server at all)
 
 The same codebase also builds a **standalone mobile app** (Capacitor): no account, no sync,

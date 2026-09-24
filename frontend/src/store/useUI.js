@@ -7,8 +7,10 @@ import { useStore } from './useStore.js'
 
 // Fire-and-forget: lets the server push a "rest over" alert if this tab gets suspended
 // before the local timer completes. No-ops for guests / offline.
-const pushRestTimer = sec => { if (useStore.getState().user) api('/api/push/rest-timer', { method: 'POST', body: JSON.stringify({ seconds: sec }) }).catch(() => {}) }
-const cancelPushRestTimer = () => { if (useStore.getState().user) api('/api/push/rest-timer/cancel', { method: 'POST', body: '{}' }).catch(() => {}) }
+let restStamp = 0
+const nextRestStamp = () => (restStamp = Math.max(Date.now(), restStamp + 1))
+const pushRestTimer = sec => { if (useStore.getState().user) api('/api/push/rest-timer', { method: 'POST', body: JSON.stringify({ seconds: sec, at: nextRestStamp() }) }).catch(() => {}) }
+const cancelPushRestTimer = () => { if (useStore.getState().user) api('/api/push/rest-timer/cancel', { method: 'POST', body: JSON.stringify({ at: nextRestStamp() }) }).catch(() => {}) }
 
 let toastTm = null
 let timerInt = null

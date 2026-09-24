@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:mobile": "VITE_MOBILE=1 VITE_IMG_BASE=https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@7455efae41b330c265e7cd4b78dfa848e7ce5ebd/images/ VITE_GIF_BASE=https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@7455efae41b330c265e7cd4b78dfa848e7ce5ebd/videos/ vite build && cap sync",
+    "build:vercel": "VITE_IMG_BASE=https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@7455efae41b330c265e7cd4b78dfa848e7ce5ebd/images/ VITE_GIF_BASE=https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@7455efae41b330c265e7cd4b78dfa848e7ce5ebd/videos/ vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -17,9 +18,13 @@
     "@capacitor/filesystem": "^7.1.8",
     "@capacitor/local-notifications": "^7.0.7",
     "@capacitor/share": "^7.0.4",
+    "@simplewebauthn/server": "^13.3.3",
+    "@upstash/redis": "^1.39.0",
+    "@vercel/functions": "^3.9.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.2",
+    "web-push": "^3.6.7",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
