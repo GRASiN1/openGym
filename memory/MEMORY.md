@@ -1,0 +1,3 @@
+- [codebase-summary](codebase-summary.md) — Comprehensive understanding of openGym codebase
+- [routine-exercise-records](routine-exercise-records.md) — Separate records for each routine:exercise combination
+- [clear-exercise-history](clear-exercise-history.md) — Clear all workout history for a specific exercise
