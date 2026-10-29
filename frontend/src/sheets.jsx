@@ -286,6 +286,29 @@ function ExerciseDetail({ ex, close }) {
   const st = useStore(s => s.S)
   const last = lastEntryFor(st, ex.id)
   const best = bestWeightFor(st, ex.id)
+
+  // Clear all history for this exercise
+  const clearHistory = () => {
+    confirmSheet({
+      title: t('Clear workout history?'),
+      message: t('This will remove all past workout records for "{0}" — only your current routine plan and best 1RM estimate will remain.', ex.n),
+      confirmText: t('Clear history'),
+      danger: true,
+      onConfirm: () => {
+        update(s => {
+          // Remove all workouts that contain this exercise
+          s.workouts = s.workouts.filter(w => !w.entries.find(e => e.id === ex.id))
+          // Also clear exWeights if it exists for this exercise
+          if (s.exWeights && s.exWeights[ex.id]) {
+            delete s.exWeights[ex.id]
+          }
+        })
+        close()
+        toast(t('History cleared for "{0}"', ex.n))
+      }
+    })
+  }
+
   return <>
     <h3 className="capitalize">{ex.n}</h3>
     <Media ex={ex} />
@@ -298,6 +321,10 @@ function ExerciseDetail({ ex, close }) {
     {ex.desc && <div className="exnote">{ex.desc}</div>}
     {best > 0 && <div className="small row" style={{ marginBottom: 6, gap: 5 }}><Icon name="trophy" style={{ fontSize: 14, color: 'var(--yellow)' }} />{t('Best:')} <b className="accent">{fmtNum(best)} {st.unit}</b>{last ? ` · ${t('last')} ${fmtDate(last.d)}: ${last.sets.map(s => setLabel(ex.id, s, last.target)).join(', ')}` : ''}</div>}
     <Button variant="primary" icon="plus" style={{ margin: '10px 0 4px' }} onClick={() => addToRoutineSheet(ex)}>{t('Add to my plan')}</Button>
+    {/* Clear history button - show only if there's workout history */}
+    {st.workouts.some(w => w.entries.find(e => e.id === ex.id)) && (
+      <Button variant="danger" icon="trash" style={{ margin: '4px 0' }} onClick={clearHistory}>{t('Clear all history')}</Button>
+    )}
     {ex.custom && <div className="row" style={{ gap: 8, marginTop: 8 }}>
       <Button icon="pencil" style={{ flex: 1 }} onClick={() => { close(); customExSheet(ex) }}>{t('Edit')}</Button>
       <Button variant="danger" icon="trash" style={{ flex: 1 }} onClick={() => deleteCustomEx(ex, close)}>{t('Delete')}</Button>
@@ -780,9 +807,13 @@ export const cycleDayAssignSheet = index => ui().openSheet(close => <CycleDayAss
 /* ============================ workout detail ============================ */
 function WorkoutDetail({ w, close }) {
   const st = useStore(s => s.S)
+  // Find the routine for this workout
+  const routine = st.routines.find(r => r.id === w.routineId)
   return <>
-    <h3>{w.name}</h3>
+    <h3>{w.name}{routine && <span style={{ color: 'var(--label-2)', fontSize: 14 }}>({routine.name})</span>}</h3>
     <div className="muted small" style={{ marginBottom: 12 }}>{[fmtDate(w.d, true), ...durPart(w.end - w.start), fmtVol(w.vol, st.unit), ...(w.bw ? [fmtNum(w.bw) + ' ' + st.unit] : [])].join(' · ')}</div>
+    {/* Group exercises by routine and show separate history for each routine:exercise combination */}
+    {routine && <div className="small dim" style={{ marginBottom: 8, color: 'var(--label-3)' }}>{t('History for this exercise in {0}', routine.name)}</div>}
     {w.entries.map((e, i) => {
       const ex = EXIDX[e.id]
       return <div key={i} className="row" style={{ marginBottom: 12, alignItems: 'flex-start' }}>
@@ -863,7 +894,7 @@ export function beginWorkout(routineId, bw) {
   // kept on the entry purely so the workout can explain the number it chose.
   const entries = (r ? r.ex : []).map(cfg => {
     const plan = nextPrescription(st, cfg, r)
-    return { id: cfg.id, sg: cfg.sg, target: { ...cfg }, plan, sets: applyPrescription(buildSets(st, cfg), plan) }
+    return { id: cfg.id, sg: cfg.sg, target: { ...cfg }, plan, sets: applyPrescription(buildSets(st, cfg, r ? r.id : null), plan) }
   })
   update(s => {
     s.active = { id: uid(), d: todayISO(), start: Date.now(), routineId, name: r ? r.name : t('Freestyle'), bw: bw || null, cur: 0, entries }

@@ -138,26 +138,80 @@ export function cleanupSg(ex) {
   })
 }
 
-export function lastEntryFor(S, exId) {
+/**
+ * Find the last entry for an exercise in a specific routine.
+ * @param {Object} S - State object
+ * @param {string} exId - Exercise ID
+ * @param {string} routineId - Routine ID (null to search all routines)
+ * @returns {Object|null} Last entry with date and sets, or null if not found
+ */
+export function lastEntryFor(S, exId, routineId = null) {
+  // If no routine specified, search all workouts
+  if (routineId === null) {
+    for (let i = S.workouts.length - 1; i >= 0; i--) {
+      const en = S.workouts[i].entries.find(e => e.id === exId)
+      if (en && en.sets.some(s => s.done)) {
+        return { d: S.workouts[i].d, sets: en.sets.filter(s => s.done), target: en.target || null }
+      }
+    }
+    return null
+  }
+
+  // Search only workouts from the specified routine
   for (let i = S.workouts.length - 1; i >= 0; i--) {
-    const en = S.workouts[i].entries.find(e => e.id === exId)
-    // `target` is what the session prescribed; finished workouts carry it so labels and the
-    // progression engine can read a session back the way it was logged. Older workouts have
-    // none — modeOf() falls back to the body part for them, which is what they were.
-    if (en && en.sets.some(s => s.done)) return { d: S.workouts[i].d, sets: en.sets.filter(s => s.done), target: en.target || null }
+    const workout = S.workouts[i]
+    // Check if this workout belongs to the specified routine
+    const routine = S.routines.find(r => r.id === workout.routineId)
+    if (routine && routine.id === routineId) {
+      const en = workout.entries.find(e => e.id === exId)
+      if (en && en.sets.some(s => s.done)) {
+        return { d: workout.d, sets: en.sets.filter(s => s.done), target: en.target || null }
+      }
+    }
   }
   return null
 }
-export function bestWeightFor(S, exId) {
+
+/**
+ * Find the best (heaviest) weight for an exercise in a specific routine.
+ * @param {Object} S - State object
+ * @param {string} exId - Exercise ID
+ * @param {string} routineId - Routine ID (null to search all routines)
+ * @returns {number} Best weight or 0 if not found
+ */
+export function bestWeightFor(S, exId, routineId = null) {
   let best = 0
-  S.workouts.forEach(w => w.entries.forEach(e => {
-    if (e.id === exId) {
-      e.sets.forEach(s => { if (s.done && s.w > best) best = s.w })
-      if (e.topW && e.topW > best) best = e.topW
-    }
-  }))
+
+  if (routineId === null) {
+    // Search all workouts
+    S.workouts.forEach(w => w.entries.forEach(e => {
+      if (e.id === exId) {
+        e.sets.forEach(s => {
+          if (s.done && s.w > best) best = s.w
+        })
+        if (e.topW && e.topW > best) best = e.topW
+      }
+    }))
+  } else {
+    // Search only workouts from the specified routine
+    S.workouts.forEach(w => {
+      const routine = S.routines.find(r => r.id === w.routineId)
+      if (routine && routine.id === routineId) {
+        w.entries.forEach(e => {
+          if (e.id === exId) {
+            e.sets.forEach(s => {
+              if (s.done && s.w > best) best = s.w
+            })
+            if (e.topW && e.topW > best) best = e.topW
+          }
+        })
+      }
+    })
+  }
+
   return best
 }
+
 const dayNumber = iso => Math.round(Date.parse(iso + 'T00:00:00Z') / 86400000)
 export const cycleOn = S => !!(S.cycle?.on && S.cycle.start && S.cycle.days?.length)
 export function cycleIndex(S, iso) {
@@ -182,8 +236,16 @@ export function effectiveRoutine(S, iso) {
   const id = effectiveRoutineId(S, iso)
   return id ? S.routines.find(r => r.id === id) || null : null
 }
-export function buildSets(S, cfg) {
-  const last = lastEntryFor(S, cfg.id)
+
+/**
+ * Build sets for an exercise, carrying over from the last workout of the same routine.
+ * @param {Object} S - State object
+ * @param {Object} cfg - Exercise configuration
+ * @param {string} routineId - Routine ID (null to search all routines)
+ * @returns {Array} Array of set objects
+ */
+export function buildSets(S, cfg, routineId = null) {
+  const last = lastEntryFor(S, cfg.id, routineId)
   const n = Math.max(1, cfg.sets || 1)
   const mode = modeOf(cfg)
   const sets = []
@@ -216,6 +278,7 @@ export function buildSets(S, cfg) {
   }
   return sets
 }
+
 export function workoutVolume(w) {
   let v = 0
   // No special case for unilateral work: a per-side set logs its total, so both sides are

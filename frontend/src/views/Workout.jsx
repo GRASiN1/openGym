@@ -59,13 +59,17 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
   const working = useUI(s => s.work)
   const entry = S.active.entries[entryIdx]
   const ex = exOr(entry.id)
+  const routine = S.routines.find(r => r.id === entry.routineId) || S.routines.find(r => r.id === S.active.routineId)
   const mode = modeOf({ ...(entry.target || {}), id: entry.id })
   const cardio = mode === 'cardio'
   const timed = mode === 'time'
-  const last = lastEntryFor(S, entry.id)
+  // Show separate records for each routine:exercise combination
+  // If this exercise is from a routine, show only that routine's history
+  // Otherwise, show all routines' history (freestyle workout)
+  const last = lastEntryFor(S, entry.id, routine ? routine.id : null)
   // The same number the "confirm your working weight" sheet calls your best, so the two
   // never disagree inside one session: heaviest logged set, or the working weight you kept.
-  const best = cardio ? 0 : Math.max(bestWeightFor(S, entry.id), (S.exWeights[entry.id] || {}).w || 0)
+  const best = cardio ? 0 : Math.max(bestWeightFor(S, entry.id, routine ? routine.id : null), (S.exWeights[entry.id] || {}).w || 0)
   // What the progression policy decided for this session, and why (issue #17). Computed when
   // the session was built so the reason matches the numbers already in the rows.
   const plan = entry.plan
